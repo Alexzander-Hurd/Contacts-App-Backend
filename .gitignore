@@ -485,3 +485,7 @@ $RECYCLE.BIN/
 
 # Config folder
 .config/
+
+# App Data
+AppData/
+AppData/*
