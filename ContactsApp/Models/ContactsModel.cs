@@ -17,3 +17,11 @@ public class ContactDTO
     public required string email { get; set; }
     public required string extension { get; set; }
 }
+
+public class Favorite
+{
+    [Key]
+    public required string id { get; set; }
+    public required string userId { get; set; }
+    public required string contactId { get; set; }
+}

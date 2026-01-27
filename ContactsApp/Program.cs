@@ -58,6 +58,16 @@ var key = builder.Configuration.GetValue<string>("Auth:SecretKey");
 if (key == null)
     throw new Exception("Missing Auth:SecretKey");
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(builder =>
+    {
+        builder.AllowAnyOrigin();
+        builder.AllowAnyHeader();
+        builder.AllowAnyMethod();
+    });
+});
+
 builder
     .Services.AddAuthentication(options =>
     {
@@ -77,25 +87,33 @@ builder
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero,
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = context =>
+            {
+                context.HandleResponse();
+
+                context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
+                context.Response.Headers.Append(
+                    "Access-Control-Allow-Headers",
+                    "Authorization, Content-Type"
+                );
+
+                context.Response.StatusCode = 401;
+                return Task.CompletedTask;
+            },
+        };
     });
 builder.Services.AddAuthorization();
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(builder =>
-    {
-        builder.AllowAnyOrigin();
-        builder.AllowAnyHeader();
-        builder.AllowAnyMethod();
-    });
-});
-
 var app = builder.Build();
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseCors();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -108,7 +126,7 @@ app.UseHttpsRedirection();
 
 app.MapPost(
         "/login",
-        (LoginRequest loginRequest, ApplicationDbContext context) =>
+        async (LoginRequest loginRequest, ApplicationDbContext context) =>
         {
             if (loginRequest == null)
                 return Results.BadRequest(new { message = "Login request is null" });
@@ -172,6 +190,24 @@ app.MapPost(
 
             context.refresh_tokens.Add(newRefreshToken);
             context.SaveChanges();
+
+            Contact? contact = await context.contacts.FirstOrDefaultAsync(c =>
+                c.email == user.username
+            );
+            if (contact == null)
+            {
+                contact = new Contact
+                {
+                    id = Guid.NewGuid().ToString(),
+                    name = user.username.Split('@')[0],
+                    email = user.username,
+                    extension = "---",
+                };
+                context.contacts.Add(contact);
+                user.contact_id = contact.id;
+                user.contact = contact;
+                context.SaveChanges();
+            }
 
             return Results.Ok(
                 new TokenResponse
@@ -388,6 +424,63 @@ app.MapPut(
     .Produces<Contact>(200)
     .Produces(401)
     .Produces<MessageResponse>(404)
+    .WithTags("Contacts");
+
+app.MapGet(
+        "/contacts/favorites",
+        [Authorize]
+        (ApplicationDbContext context, HttpContext request) =>
+        {
+            var user = request.User;
+            string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+            if (userId == null)
+                return Results.BadRequest(new { message = "User id is null" });
+
+            var favoriteContacts =
+                from fav in context.favorites
+                join contact in context.contacts on fav.contactId equals contact.id
+                where fav.userId == userId
+                select contact;
+
+            return Results.Ok(favoriteContacts.ToList());
+        }
+    )
+    .Produces<List<Contact>>(200)
+    .Produces(401)
+    .WithTags("Contacts");
+
+app.MapPost(
+        "/contacts/favorites/{id}",
+        [Authorize]
+        async (string id, ApplicationDbContext context, HttpContext request) =>
+        {
+            var user = request.User;
+            string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+            if (id == null)
+                return Results.BadRequest(new { message = "Contact id is null" });
+
+            if (userId == null)
+                return Results.BadRequest(new { message = "User id is null" });
+
+            Contact? contact = await context.contacts.FirstOrDefaultAsync(c => c.id == id);
+            if (contact == null)
+                return Results.NotFound(new { message = "Contact with supplied id not found" });
+
+            Favorite favorite = new Favorite
+            {
+                id = Guid.NewGuid().ToString(),
+                userId = userId,
+                contactId = id,
+            };
+            context.favorites.Add(favorite);
+            context.SaveChanges();
+            return Results.Ok(favorite);
+        }
+    )
+    .Produces<Favorite>(200)
+    .Produces(401)
     .WithTags("Contacts");
 
 app.Run();
