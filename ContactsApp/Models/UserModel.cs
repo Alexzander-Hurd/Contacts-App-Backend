@@ -23,3 +23,22 @@ public class RefreshToken
     public required DateTime expiry { get; set; }
     public bool revoked { get; set; } = false;
 }
+
+public class LoginRequest
+{
+    public required string username { get; set; }
+    public required string password { get; set; }
+}
+
+public class registerResponse
+{
+    public required string accessToken { get; set; }
+    public required string refreshToken { get; set; }
+}
+
+public class TokenResponse
+{
+    public required string token { get; set; }
+    public required double expiry { get; set; }
+    public required string refresh { get; set; }
+}

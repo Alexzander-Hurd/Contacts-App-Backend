@@ -107,258 +107,288 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapPost(
-    "/login",
-    (LoginRequest loginRequest, ApplicationDbContext context) =>
-    {
-        if (loginRequest == null)
-            return Results.BadRequest(new { message = "Login request is null" });
-        if (
-            string.IsNullOrWhiteSpace(loginRequest.username)
-            || string.IsNullOrWhiteSpace(loginRequest.password)
-        )
-            return Results.BadRequest(new { message = "Username or password is missing" });
-
-        User? user = context.users.FirstOrDefault(u => u.username == loginRequest.username);
-        if (user == null)
-            return Results.Unauthorized();
-
-        string passwordHash = Convert.ToBase64String(
-            Rfc2898DeriveBytes.Pbkdf2(
-                Encoding.UTF8.GetBytes(loginRequest.password),
-                Encoding.UTF8.GetBytes(user.salt),
-                10000,
-                HashAlgorithmName.SHA256,
-                32
+        "/login",
+        (LoginRequest loginRequest, ApplicationDbContext context) =>
+        {
+            if (loginRequest == null)
+                return Results.BadRequest(new { message = "Login request is null" });
+            if (
+                string.IsNullOrWhiteSpace(loginRequest.username)
+                || string.IsNullOrWhiteSpace(loginRequest.password)
             )
-        );
-        if (string.IsNullOrWhiteSpace(passwordHash))
-            return Results.StatusCode(500);
+                return Results.BadRequest(new { message = "Username or password is missing" });
 
-        if (user.password != passwordHash)
-            return Results.Unauthorized();
+            User? user = context.users.FirstOrDefault(u => u.username == loginRequest.username);
+            if (user == null)
+                return Results.Unauthorized();
 
-        JwtSecurityTokenHandler token_handler = new JwtSecurityTokenHandler();
-        SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity([
-                new Claim(JwtRegisteredClaimNames.UniqueName, user.username),
-                new Claim(ClaimTypes.Role, user.role ?? "User"),
-                new Claim(JwtRegisteredClaimNames.Sub, user.id),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(
-                    JwtRegisteredClaimNames.Iat,
-                    DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
-                ),
-            ]),
-            Expires = DateTime.UtcNow.AddMinutes(15),
-            SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
-                SecurityAlgorithms.HmacSha256Signature
-            ),
-            Issuer = "ContactsApp",
-        };
+            string passwordHash = Convert.ToBase64String(
+                Rfc2898DeriveBytes.Pbkdf2(
+                    Encoding.UTF8.GetBytes(loginRequest.password),
+                    Encoding.UTF8.GetBytes(user.salt),
+                    10000,
+                    HashAlgorithmName.SHA256,
+                    32
+                )
+            );
+            if (string.IsNullOrWhiteSpace(passwordHash))
+                return Results.StatusCode(500);
 
-        SecurityToken token = token_handler.CreateToken(tokenDescriptor);
-        string jwt = token_handler.WriteToken(token);
+            if (user.password != passwordHash)
+                return Results.Unauthorized();
 
-        string refreshToken = Guid.NewGuid().ToString();
-        RefreshToken newRefreshToken = new RefreshToken
-        {
-            id = Guid.NewGuid().ToString(),
-            token = refreshToken,
-            user = user,
-            expiry = DateTime.UtcNow.AddDays(1),
-        };
-
-        context.refresh_tokens.Add(newRefreshToken);
-        context.SaveChanges();
-
-        return Results.Ok(
-            new
+            JwtSecurityTokenHandler token_handler = new JwtSecurityTokenHandler();
+            SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
             {
-                token = jwt,
-                expiry = TimeSpan.FromMinutes(15).TotalSeconds,
-                refresh = refreshToken,
-            }
-        );
-    }
-);
-
-app.MapPost(
-    "/refresh",
-    (string refreshToken, ApplicationDbContext context) =>
-    {
-        RefreshToken? token = context
-            .refresh_tokens.Include(t => t.user)
-            .FirstOrDefault(t => t.token == refreshToken);
-        if (token == null)
-            return Results.BadRequest(new { message = "Invalid or expired refresh token" });
-        if (token.expiry < DateTime.UtcNow)
-        {
-            context.refresh_tokens.Remove(token);
-            context.SaveChanges();
-            return Results.BadRequest(new { message = "Expired refresh token" });
-        }
-        JwtSecurityTokenHandler token_handler = new JwtSecurityTokenHandler();
-        SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity([
-                new Claim(JwtRegisteredClaimNames.UniqueName, token.user.username),
-                new Claim(ClaimTypes.Role, token.user.role ?? "User"),
-                new Claim(JwtRegisteredClaimNames.Sub, token.user.id),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(
-                    JwtRegisteredClaimNames.Iat,
-                    DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+                Subject = new ClaimsIdentity([
+                    new Claim(JwtRegisteredClaimNames.UniqueName, user.username),
+                    new Claim(ClaimTypes.Role, user.role ?? "User"),
+                    new Claim(JwtRegisteredClaimNames.Sub, user.id),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new Claim(
+                        JwtRegisteredClaimNames.Iat,
+                        DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+                    ),
+                ]),
+                Expires = DateTime.UtcNow.AddMinutes(15),
+                SigningCredentials = new SigningCredentials(
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+                    SecurityAlgorithms.HmacSha256Signature
                 ),
-            ]),
-            Expires = DateTime.UtcNow.AddMinutes(15),
-            SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
-                SecurityAlgorithms.HmacSha256Signature
-            ),
-            Issuer = "ContactsApp",
-        };
+                Issuer = "ContactsApp",
+            };
 
-        SecurityToken token2 = token_handler.CreateToken(tokenDescriptor);
-        string jwt = token_handler.WriteToken(token2);
+            SecurityToken token = token_handler.CreateToken(tokenDescriptor);
+            string jwt = token_handler.WriteToken(token);
 
-        string newRefreshToken = Guid.NewGuid().ToString();
-        token.token = newRefreshToken;
-        token.expiry = DateTime.UtcNow.AddDays(1);
-        context.SaveChanges();
-        return Results.Ok(
-            new
-            {
-                token = jwt,
-                expiry = TimeSpan.FromMinutes(15).TotalSeconds,
-                refresh = newRefreshToken,
-            }
-        );
-    }
-);
-
-app.MapGet(
-    "/logout",
-    [Authorize]
-    (ApplicationDbContext context, HttpContext request) =>
-    {
-        var user = request.User;
-        List<RefreshToken>? tokens = context
-            .refresh_tokens.Include(t => t.user)
-            .Where(t => t.user.id == user.FindFirstValue(JwtRegisteredClaimNames.Sub))
-            .ToList();
-        if (tokens != null)
-        {
-            context.refresh_tokens.RemoveRange(tokens);
-            context.SaveChanges();
-        }
-        return Results.Ok(new { message = "Logout successful" });
-    }
-);
-
-app.MapPost(
-    "/register",
-    (LoginRequest loginRequest, ApplicationDbContext context) =>
-    {
-        if (loginRequest == null)
-            return Results.BadRequest(new { message = "Request is empty" });
-        if (
-            string.IsNullOrWhiteSpace(loginRequest.username)
-            || string.IsNullOrWhiteSpace(loginRequest.password)
-        )
-            return Results.BadRequest(new { message = "Username or password is missing" });
-
-        User? user = context.users.FirstOrDefault(u => u.username == loginRequest.username);
-        if (user != null)
-            return Results.BadRequest(new { message = "User already exists" });
-
-        string role = context.users.Any() ? "User" : "Admin";
-        string salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
-        string passwordHash = Convert.ToBase64String(
-            Rfc2898DeriveBytes.Pbkdf2(
-                Encoding.UTF8.GetBytes(loginRequest.password),
-                Encoding.UTF8.GetBytes(salt),
-                10000,
-                HashAlgorithmName.SHA256,
-                32
-            )
-        );
-        user = new User
-        {
-            id = Guid.NewGuid().ToString(),
-            username = loginRequest.username,
-            password = passwordHash,
-            salt = salt,
-            role = role,
-        };
-        context.users.Add(user);
-        context.SaveChanges();
-        return Results.Ok(new { loginRequest.username, role });
-    }
-);
-
-app.MapGet(
-    "/contacts",
-    [Authorize]
-    (ApplicationDbContext context) =>
-    {
-        List<Contact> contacts = context.contacts.ToList();
-        return Results.Ok(contacts);
-    }
-);
-
-app.MapPost(
-    "/contacts",
-    [Authorize(Roles = "Admin")]
-    (ContactDTO contact, ApplicationDbContext context) =>
-    {
-        if (contact == null)
-            return Results.BadRequest(new { message = "Contact is null" });
-        context.contacts.Add(
-            new Contact
+            string refreshToken = Guid.NewGuid().ToString();
+            RefreshToken newRefreshToken = new RefreshToken
             {
                 id = Guid.NewGuid().ToString(),
-                name = contact.name,
-                email = contact.email,
-                extension = contact.extension,
+                token = refreshToken,
+                user = user,
+                expiry = DateTime.UtcNow.AddDays(1),
+            };
+
+            context.refresh_tokens.Add(newRefreshToken);
+            context.SaveChanges();
+
+            return Results.Ok(
+                new TokenResponse
+                {
+                    token = jwt,
+                    expiry = TimeSpan.FromMinutes(15).TotalSeconds,
+                    refresh = refreshToken,
+                }
+            );
+        }
+    )
+    .Produces<TokenResponse>(200)
+    .Produces<MessageResponse>(400)
+    .Produces(401)
+    .Produces(500)
+    .WithTags("Auth");
+
+app.MapPost(
+        "/refresh",
+        (string refreshToken, ApplicationDbContext context) =>
+        {
+            RefreshToken? token = context
+                .refresh_tokens.Include(t => t.user)
+                .FirstOrDefault(t => t.token == refreshToken);
+            if (token == null)
+                return Results.BadRequest(new { message = "Invalid or expired refresh token" });
+            if (token.expiry < DateTime.UtcNow)
+            {
+                context.refresh_tokens.Remove(token);
+                context.SaveChanges();
+                return Results.BadRequest(new { message = "Expired refresh token" });
             }
-        );
-        context.SaveChanges();
-        return Results.Ok(contact);
-    }
-);
+            JwtSecurityTokenHandler token_handler = new JwtSecurityTokenHandler();
+            SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity([
+                    new Claim(JwtRegisteredClaimNames.UniqueName, token.user.username),
+                    new Claim(ClaimTypes.Role, token.user.role ?? "User"),
+                    new Claim(JwtRegisteredClaimNames.Sub, token.user.id),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new Claim(
+                        JwtRegisteredClaimNames.Iat,
+                        DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+                    ),
+                ]),
+                Expires = DateTime.UtcNow.AddMinutes(15),
+                SigningCredentials = new SigningCredentials(
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+                    SecurityAlgorithms.HmacSha256Signature
+                ),
+                Issuer = "ContactsApp",
+            };
+
+            SecurityToken token2 = token_handler.CreateToken(tokenDescriptor);
+            string jwt = token_handler.WriteToken(token2);
+
+            string newRefreshToken = Guid.NewGuid().ToString();
+            token.token = newRefreshToken;
+            token.expiry = DateTime.UtcNow.AddDays(1);
+            context.SaveChanges();
+            return Results.Ok(
+                new
+                {
+                    token = jwt,
+                    expiry = TimeSpan.FromMinutes(15).TotalSeconds,
+                    refresh = newRefreshToken,
+                }
+            );
+        }
+    )
+    .Produces<TokenResponse>(200)
+    .Produces<MessageResponse>(400)
+    .WithTags("Auth");
+
+app.MapGet(
+        "/logout",
+        [Authorize]
+        (ApplicationDbContext context, HttpContext request) =>
+        {
+            var user = request.User;
+            List<RefreshToken>? tokens = context
+                .refresh_tokens.Include(t => t.user)
+                .Where(t => t.user.id == user.FindFirstValue(JwtRegisteredClaimNames.Sub))
+                .ToList();
+            if (tokens != null)
+            {
+                context.refresh_tokens.RemoveRange(tokens);
+                context.SaveChanges();
+            }
+            return Results.Ok(new { message = "Logout successful" });
+        }
+    )
+    .Produces<MessageResponse>(200)
+    .Produces(401)
+    .WithTags("Auth");
+
+app.MapPost(
+        "/register",
+        (LoginRequest loginRequest, ApplicationDbContext context) =>
+        {
+            if (loginRequest == null)
+                return Results.BadRequest(new { message = "Request is empty" });
+            if (
+                string.IsNullOrWhiteSpace(loginRequest.username)
+                || string.IsNullOrWhiteSpace(loginRequest.password)
+            )
+                return Results.BadRequest(new { message = "Username or password is missing" });
+
+            User? user = context.users.FirstOrDefault(u => u.username == loginRequest.username);
+            if (user != null)
+                return Results.BadRequest(new { message = "User already exists" });
+
+            string role = context.users.Any() ? "User" : "Admin";
+            string salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+            string passwordHash = Convert.ToBase64String(
+                Rfc2898DeriveBytes.Pbkdf2(
+                    Encoding.UTF8.GetBytes(loginRequest.password),
+                    Encoding.UTF8.GetBytes(salt),
+                    10000,
+                    HashAlgorithmName.SHA256,
+                    32
+                )
+            );
+            user = new User
+            {
+                id = Guid.NewGuid().ToString(),
+                username = loginRequest.username,
+                password = passwordHash,
+                salt = salt,
+                role = role,
+            };
+            context.users.Add(user);
+            context.SaveChanges();
+            return Results.Ok(new { loginRequest.username, role });
+        }
+    )
+    .Produces<registerResponse>(200)
+    .Produces<MessageResponse>(400)
+    .WithTags("Auth");
+
+app.MapGet(
+        "/contacts",
+        [Authorize]
+        (ApplicationDbContext context) =>
+        {
+            List<Contact> contacts = context.contacts.ToList();
+            return Results.Ok(contacts);
+        }
+    )
+    .Produces<List<Contact>>(200)
+    .Produces(401)
+    .WithTags("Contacts");
+
+app.MapPost(
+        "/contacts",
+        [Authorize(Roles = "Admin")]
+        (ContactDTO contact, ApplicationDbContext context) =>
+        {
+            if (contact == null)
+                return Results.BadRequest(new { message = "Contact is null" });
+            context.contacts.Add(
+                new Contact
+                {
+                    id = Guid.NewGuid().ToString(),
+                    name = contact.name,
+                    email = contact.email,
+                    extension = contact.extension,
+                }
+            );
+            context.SaveChanges();
+            return Results.Ok(contact);
+        }
+    )
+    .Produces<Contact>(200)
+    .Produces<MessageResponse>(400)
+    .Produces(401)
+    .WithTags("Contacts");
+;
 
 app.MapDelete(
-    "/contacts/{id}",
-    [Authorize(Roles = "Admin")]
-    (string id, ApplicationDbContext context) =>
-    {
-        Contact? contact = context.contacts.Find(id);
-        if (contact == null)
-            return Results.NotFound(new { message = "Contact with supplied id not found" });
-        context.contacts.Remove(contact);
-        context.SaveChanges();
-        return Results.Ok(contact);
-    }
-);
+        "/contacts/{id}",
+        [Authorize(Roles = "Admin")]
+        (string id, ApplicationDbContext context) =>
+        {
+            Contact? contact = context.contacts.Find(id);
+            if (contact == null)
+                return Results.NotFound(new { message = "Contact with supplied id not found" });
+            context.contacts.Remove(contact);
+            context.SaveChanges();
+            return Results.Ok(contact);
+        }
+    )
+    .Produces<Contact>(200)
+    .Produces(401)
+    .Produces<MessageResponse>(404)
+    .WithTags("Contacts");
 
 app.MapPut(
-    "/contacts/{id}",
-    [Authorize(Roles = "Admin")]
-    (string id, ContactDTO contact, ApplicationDbContext context) =>
-    {
-        Contact? contactToUpdate = context.contacts.Find(id);
-        if (contactToUpdate == null)
-            return Results.NotFound(new { message = "Contact with supplied id not found" });
+        "/contacts/{id}",
+        [Authorize(Roles = "Admin")]
+        (string id, ContactDTO contact, ApplicationDbContext context) =>
+        {
+            Contact? contactToUpdate = context.contacts.Find(id);
+            if (contactToUpdate == null)
+                return Results.NotFound(new { message = "Contact with supplied id not found" });
 
-        contactToUpdate.name = contact.name;
-        contactToUpdate.email = contact.email;
-        contactToUpdate.extension = contact.extension;
-        context.SaveChanges();
-        return Results.Ok(contactToUpdate);
-    }
-);
+            contactToUpdate.name = contact.name;
+            contactToUpdate.email = contact.email;
+            contactToUpdate.extension = contact.extension;
+            context.SaveChanges();
+            return Results.Ok(contactToUpdate);
+        }
+    )
+    .Produces<Contact>(200)
+    .Produces(401)
+    .Produces<MessageResponse>(404)
+    .WithTags("Contacts");
 
 app.Run();
 
