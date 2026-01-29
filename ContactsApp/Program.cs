@@ -138,7 +138,10 @@ app.MapPost(
 
             User? user = context.users.FirstOrDefault(u => u.username == loginRequest.username);
             if (user == null)
-                return Results.Unauthorized();
+                return Results.Json(
+                    new { message = "Invalid username or password" },
+                    statusCode: 401
+                );
 
             string passwordHash = Convert.ToBase64String(
                 Rfc2898DeriveBytes.Pbkdf2(
@@ -153,7 +156,10 @@ app.MapPost(
                 return Results.StatusCode(500);
 
             if (user.password != passwordHash)
-                return Results.Unauthorized();
+                return Results.Json(
+                    new { message = "Invalid username or password" },
+                    statusCode: 401
+                );
 
             JwtSecurityTokenHandler token_handler = new JwtSecurityTokenHandler();
             SecurityTokenDescriptor tokenDescriptor = new SecurityTokenDescriptor
@@ -221,7 +227,7 @@ app.MapPost(
     )
     .Produces<TokenResponse>(200)
     .Produces<MessageResponse>(400)
-    .Produces(401)
+    .Produces<MessageResponse>(401)
     .Produces(500)
     .WithTags("Auth");
 
@@ -480,6 +486,30 @@ app.MapPost(
         }
     )
     .Produces<Favorite>(200)
+    .Produces(401)
+    .WithTags("Contacts");
+
+app.MapGet(
+        "/me",
+        [Authorize]
+        async (ApplicationDbContext context, HttpContext request) =>
+        {
+            var user = request.User;
+            string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+            if (userId == null)
+                return Results.BadRequest(new { message = "User id is null" });
+
+            User? appUser = await context
+                .users.Include(u => u.contact)
+                .FirstOrDefaultAsync(u => u.id == userId);
+            if (appUser == null || appUser.contact == null)
+                return Results.NotFound(new { message = "User not found" });
+
+            return Results.Ok(appUser.contact);
+        }
+    )
+    .Produces<Contact>(200)
     .Produces(401)
     .WithTags("Contacts");
 
