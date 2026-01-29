@@ -489,6 +489,44 @@ app.MapPost(
     .Produces(401)
     .WithTags("Contacts");
 
+    app.MapDelete(
+        "/contacts/favorites/{id}",
+        [Authorize]
+        async (string id, ApplicationDbContext context, HttpContext request) =>
+        {
+            var user = request.User;
+            string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+            if (id == null)
+                return Results.BadRequest(new { message = "Contact id is null" });
+
+            if (userId == null)
+                return Results.BadRequest(new { message = "User id is null" });
+
+            Contact? contact = await context.contacts.FirstOrDefaultAsync(c => c.id == id);
+            if (contact == null)
+                return Results.NotFound(new { message = "Contact with supplied id not found" });
+
+            Favorite? favorite = new Favorite
+            {
+                id = Guid.NewGuid().ToString(),
+                userId = userId,
+                contactId = id,
+            };
+
+            Favorite? existingFavorite = await context.favorites.AsNoTracking().FirstOrDefaultAsync(f => f.userId == userId && f.contactId == id);
+            if (existingFavorite == null)
+                return Results.Ok(favorite);
+
+            context.favorites.Remove(existingFavorite);
+            context.SaveChanges();
+            return Results.Ok(existingFavorite);
+        }
+    )
+    .Produces<Favorite>(200)
+    .Produces(401)
+    .WithTags("Contacts");
+
 app.MapGet(
         "/me",
         [Authorize]
