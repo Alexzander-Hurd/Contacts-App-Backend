@@ -369,7 +369,7 @@ app.MapGet(
 
 app.MapPost(
         "/contacts",
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         (ContactDTO contact, ApplicationDbContext context) =>
         {
             if (contact == null)
