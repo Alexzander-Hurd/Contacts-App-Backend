@@ -489,7 +489,7 @@ app.MapPost(
     .Produces(401)
     .WithTags("Contacts");
 
-    app.MapDelete(
+app.MapDelete(
         "/contacts/favorites/{id}",
         [Authorize]
         async (string id, ApplicationDbContext context, HttpContext request) =>
@@ -514,7 +514,9 @@ app.MapPost(
                 contactId = id,
             };
 
-            Favorite? existingFavorite = await context.favorites.AsNoTracking().FirstOrDefaultAsync(f => f.userId == userId && f.contactId == id);
+            Favorite? existingFavorite = await context
+                .favorites.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.userId == userId && f.contactId == id);
             if (existingFavorite == null)
                 return Results.Ok(favorite);
 
