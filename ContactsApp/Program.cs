@@ -374,17 +374,16 @@ app.MapPost(
         {
             if (contact == null)
                 return Results.BadRequest(new { message = "Contact is null" });
-            context.contacts.Add(
-                new Contact
-                {
-                    id = Guid.NewGuid().ToString(),
-                    name = contact.name,
-                    email = contact.email,
-                    extension = contact.extension,
-                }
-            );
+            Contact newContact = new Contact
+            {
+                id = Guid.NewGuid().ToString(),
+                name = contact.name,
+                email = contact.email,
+                extension = contact.extension,
+            };
+            context.contacts.Add(newContact);
             context.SaveChanges();
-            return Results.Ok(contact);
+            return Results.Ok(newContact);
         }
     )
     .Produces<Contact>(200)
