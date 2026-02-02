@@ -12,4 +12,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> users { get; set; }
     public DbSet<RefreshToken> refresh_tokens { get; set; }
     public DbSet<Favorite> favorites { get; set; }
+    public DbSet<Group> groups { get; set; }
+    public DbSet<GroupMember> group_members { get; set; }
 }

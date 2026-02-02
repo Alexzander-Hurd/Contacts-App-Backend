@@ -120,6 +120,7 @@ app.UseHttpsRedirection();
 
 app.MapAuthRoutes(app.Configuration);
 app.MapContactsRoutes();
+app.MapGroupsRoutes();
 
 app.Run();
 
