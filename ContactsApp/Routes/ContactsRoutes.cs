@@ -10,9 +10,10 @@ public static class ContactRoutes
 {
     public static void MapContactsRoutes(this IEndpointRouteBuilder app)
     {
-        app.MapGet(
+        var group = app.MapGroup("/contacts").RequireAuthorization().WithTags("Contacts");
+        group
+            .MapGet(
                 "/contacts",
-                [Authorize]
                 (ApplicationDbContext context) =>
                 {
                     List<Contact> contacts = context.contacts.ToList();
@@ -20,12 +21,11 @@ public static class ContactRoutes
                 }
             )
             .Produces<List<Contact>>(200)
-            .Produces(401)
-            .WithTags("Contacts");
+            .Produces(401);
 
-        app.MapPost(
+        group
+            .MapPost(
                 "/contacts",
-                [Authorize]
                 (ContactDTO contact, ApplicationDbContext context) =>
                 {
                     if (contact == null)
@@ -44,11 +44,11 @@ public static class ContactRoutes
             )
             .Produces<Contact>(200)
             .Produces<MessageResponse>(400)
-            .Produces(401)
-            .WithTags("Contacts");
+            .Produces(401);
         ;
 
-        app.MapDelete(
+        group
+            .MapDelete(
                 "/contacts/{id}",
                 [Authorize(Roles = "Admin")]
                 (string id, ApplicationDbContext context) =>
@@ -65,10 +65,10 @@ public static class ContactRoutes
             )
             .Produces<Contact>(200)
             .Produces(401)
-            .Produces<MessageResponse>(404)
-            .WithTags("Contacts");
+            .Produces<MessageResponse>(404);
 
-        app.MapPut(
+        group
+            .MapPut(
                 "/contacts/{id}",
                 [Authorize(Roles = "Admin")]
                 (string id, ContactDTO contact, ApplicationDbContext context) =>
@@ -88,12 +88,11 @@ public static class ContactRoutes
             )
             .Produces<Contact>(200)
             .Produces(401)
-            .Produces<MessageResponse>(404)
-            .WithTags("Contacts");
+            .Produces<MessageResponse>(404);
 
-        app.MapGet(
+        group
+            .MapGet(
                 "/contacts/favorites",
-                [Authorize]
                 (ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -112,12 +111,11 @@ public static class ContactRoutes
                 }
             )
             .Produces<List<Contact>>(200)
-            .Produces(401)
-            .WithTags("Contacts");
+            .Produces(401);
 
-        app.MapPost(
+        group
+            .MapPost(
                 "/contacts/favorites/{id}",
-                [Authorize]
                 async (string id, ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -147,12 +145,11 @@ public static class ContactRoutes
                 }
             )
             .Produces<Favorite>(200)
-            .Produces(401)
-            .WithTags("Contacts");
+            .Produces(401);
 
-        app.MapDelete(
+        group
+            .MapDelete(
                 "/contacts/favorites/{id}",
-                [Authorize]
                 async (string id, ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -189,12 +186,11 @@ public static class ContactRoutes
                 }
             )
             .Produces<Favorite>(200)
-            .Produces(401)
-            .WithTags("Contacts");
+            .Produces(401);
 
-        app.MapGet(
+        group
+            .MapGet(
                 "/me",
-                [Authorize]
                 async (ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -213,7 +209,6 @@ public static class ContactRoutes
                 }
             )
             .Produces<Contact>(200)
-            .Produces(401)
-            .WithTags("Contacts");
+            .Produces(401);
     }
 }

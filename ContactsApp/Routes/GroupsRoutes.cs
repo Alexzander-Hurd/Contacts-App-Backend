@@ -28,8 +28,7 @@ public static class GroupsRoutes
             .Produces<List<Group>>(200)
             .Produces(204)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
 
         group
             .MapPost(
@@ -50,8 +49,7 @@ public static class GroupsRoutes
             .Produces<Group>(201)
             .Produces<MessageResponse>(400)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
 
         group
             .MapGet(
@@ -84,8 +82,7 @@ public static class GroupsRoutes
             .Produces<GroupDetails>(200)
             .Produces<MessageResponse>(404)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
 
         group
             .MapDelete(
@@ -107,8 +104,7 @@ public static class GroupsRoutes
             .Produces<Group>(200)
             .Produces<MessageResponse>(404)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
 
         group
             .MapPut(
@@ -127,8 +123,7 @@ public static class GroupsRoutes
             .Produces<Group>(200)
             .Produces<MessageResponse>(404)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
 
         group
             .MapPost(
@@ -154,8 +149,7 @@ public static class GroupsRoutes
             .Produces<GroupMember>(201)
             .Produces<MessageResponse>(400)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
 
         group
             .MapDelete(
@@ -175,7 +169,6 @@ public static class GroupsRoutes
             .Produces<GroupMember>(200)
             .Produces<MessageResponse>(404)
             .Produces(401)
-            .Produces(500)
-            .WithTags("Groups");
+            .Produces(500);
     }
 }
