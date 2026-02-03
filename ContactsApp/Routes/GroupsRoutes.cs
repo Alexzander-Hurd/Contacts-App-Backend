@@ -15,7 +15,7 @@ public static class GroupsRoutes
 
         group
             .MapGet(
-                "/groups",
+                "/",
                 async (ApplicationDbContext context) =>
                 {
                     var groups = await context.groups.ToListAsync();
@@ -32,7 +32,7 @@ public static class GroupsRoutes
 
         group
             .MapPost(
-                "/groups",
+                "/",
                 async (GroupDTO data, ApplicationDbContext context) =>
                 {
                     Group group = new Group()
@@ -53,7 +53,7 @@ public static class GroupsRoutes
 
         group
             .MapGet(
-                "/groups/{id}",
+                "/{id}",
                 async (string id, ApplicationDbContext context) =>
                 {
                     Group? group = await context.groups.FindAsync(id);
@@ -86,7 +86,7 @@ public static class GroupsRoutes
 
         group
             .MapDelete(
-                "/groups/{id}",
+                "/{id}",
                 async (string id, ApplicationDbContext context) =>
                 {
                     Group? group = await context.groups.FindAsync(id);
@@ -108,7 +108,7 @@ public static class GroupsRoutes
 
         group
             .MapPut(
-                "/groups/{id}",
+                "/{id}",
                 async (string id, GroupDTO data, ApplicationDbContext context) =>
                 {
                     Group? group = await context.groups.FindAsync(id);
@@ -127,33 +127,37 @@ public static class GroupsRoutes
 
         group
             .MapPost(
-                "/groups/{id}/members/{contactId}",
-                async (string id, string contactId, ApplicationDbContext context) =>
+                "/{id}/members/{contact}",
+                async (string id, string contact, ApplicationDbContext context) =>
                 {
                     Group? group = await context.groups.FindAsync(id);
                     if (group == null)
                         return Results.Json(new { message = "Group not found" }, statusCode: 404);
 
-                    Contact? contact = await context.contacts.FirstOrDefaultAsync(c =>
-                        c.id == contactId
+                    Contact? contactObj = await context.contacts.FirstOrDefaultAsync(c =>
+                        c.id == contact || c.email == contact || c.extension == contact
                     );
                     if (contact == null)
                         return Results.Json(new { message = "Contact not found" }, statusCode: 404);
 
-                    GroupMember data = new GroupMember() { groupId = id, contactId = contactId };
+                    GroupMember data = new GroupMember()
+                    {
+                        groupId = id,
+                        contactId = contactObj!.id!,
+                    };
                     context.group_members.Add(data);
                     await context.SaveChangesAsync();
-                    return TypedResults.Ok(data);
+                    return TypedResults.Ok(contactObj);
                 }
             )
-            .Produces<GroupMember>(201)
+            .Produces<Contact>(200)
             .Produces<MessageResponse>(400)
             .Produces(401)
             .Produces(500);
 
         group
             .MapDelete(
-                "/groups/{id}/members/{contactId}",
+                "/{id}/members/{contactId}",
                 async (string id, string contactId, ApplicationDbContext context) =>
                 {
                     GroupMember? member = await context.group_members.FirstOrDefaultAsync(c =>
@@ -161,6 +165,7 @@ public static class GroupsRoutes
                     );
                     if (member == null)
                         return Results.Json(new { message = "Member not found" }, statusCode: 404);
+
                     context.group_members.Remove(member);
                     await context.SaveChangesAsync();
                     return TypedResults.Ok(member);

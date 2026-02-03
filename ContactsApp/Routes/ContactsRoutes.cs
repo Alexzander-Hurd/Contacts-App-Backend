@@ -13,7 +13,7 @@ public static class ContactRoutes
         var group = app.MapGroup("/contacts").RequireAuthorization().WithTags("Contacts");
         group
             .MapGet(
-                "/contacts",
+                "/",
                 (ApplicationDbContext context) =>
                 {
                     List<Contact> contacts = context.contacts.ToList();
@@ -25,7 +25,7 @@ public static class ContactRoutes
 
         group
             .MapPost(
-                "/contacts",
+                "/",
                 (ContactDTO contact, ApplicationDbContext context) =>
                 {
                     if (contact == null)
@@ -49,7 +49,7 @@ public static class ContactRoutes
 
         group
             .MapDelete(
-                "/contacts/{id}",
+                "/{id}",
                 [Authorize(Roles = "Admin")]
                 (string id, ApplicationDbContext context) =>
                 {
@@ -69,7 +69,7 @@ public static class ContactRoutes
 
         group
             .MapPut(
-                "/contacts/{id}",
+                "/{id}",
                 [Authorize(Roles = "Admin")]
                 (string id, ContactDTO contact, ApplicationDbContext context) =>
                 {
@@ -92,7 +92,7 @@ public static class ContactRoutes
 
         group
             .MapGet(
-                "/contacts/favorites",
+                "/favorites",
                 (ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -115,7 +115,7 @@ public static class ContactRoutes
 
         group
             .MapPost(
-                "/contacts/favorites/{id}",
+                "/favorites/{id}",
                 async (string id, ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -149,7 +149,7 @@ public static class ContactRoutes
 
         group
             .MapDelete(
-                "/contacts/favorites/{id}",
+                "/favorites/{id}",
                 async (string id, ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -188,9 +188,9 @@ public static class ContactRoutes
             .Produces<Favorite>(200)
             .Produces(401);
 
-        group
-            .MapGet(
+        app.MapGet(
                 "/me",
+                [Authorize]
                 async (ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
@@ -209,6 +209,7 @@ public static class ContactRoutes
                 }
             )
             .Produces<Contact>(200)
-            .Produces(401);
+            .Produces(401)
+            .WithTags("Contacts");
     }
 }
