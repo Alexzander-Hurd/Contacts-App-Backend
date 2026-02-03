@@ -14,9 +14,23 @@ public static class ContactRoutes
         group
             .MapGet(
                 "/",
-                (ApplicationDbContext context) =>
+                async (ApplicationDbContext context, HttpContext request) =>
                 {
+                    var user = request.User;
+                    string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
                     List<Contact> contacts = context.contacts.ToList();
+
+                    if (userId == null)
+                        return Results.Ok(contacts);
+
+                    User? appUser = await context
+                        .users.Include(u => u.contact)
+                        .FirstOrDefaultAsync(u => u.id == userId);
+                    if (appUser == null || appUser.contact == null)
+                        return Results.Ok(contacts);
+
+                    contacts = contacts.Where(c => c.id != appUser.contact.id).ToList();
                     return Results.Ok(contacts);
                 }
             )

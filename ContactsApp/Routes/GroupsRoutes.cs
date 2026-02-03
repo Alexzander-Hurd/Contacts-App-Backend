@@ -54,8 +54,11 @@ public static class GroupsRoutes
         group
             .MapGet(
                 "/{id}",
-                async (string id, ApplicationDbContext context) =>
+                async (string id, ApplicationDbContext context, HttpContext request) =>
                 {
+                    var user = request.User;
+                    string? userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
                     Group? group = await context.groups.FindAsync(id);
                     if (group == null)
                         return Results.Json(new { message = "Group not found" }, statusCode: 404);
@@ -76,6 +79,17 @@ public static class GroupsRoutes
                         description = group.description ?? "",
                         members = contacts,
                     };
+
+                    if (userId == null)
+                        return Results.Ok(groupDetails);
+
+                    User? appUser = await context
+                        .users.Include(u => u.contact)
+                        .FirstOrDefaultAsync(u => u.id == userId);
+                    if (appUser == null || appUser.contact == null)
+                        return Results.Ok(groupDetails);
+
+                    groupDetails.members = contacts.Where(c => c.id != appUser.contact.id).ToList();
                     return TypedResults.Ok(groupDetails);
                 }
             )
