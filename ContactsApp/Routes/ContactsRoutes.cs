@@ -17,7 +17,7 @@ public static class ContactRoutes
                 async (ApplicationDbContext context, HttpContext request) =>
                 {
                     var user = request.User;
-                    string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+                    string? userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
 
                     List<Contact> contacts = context.contacts.ToList();
 
@@ -64,14 +64,30 @@ public static class ContactRoutes
         group
             .MapDelete(
                 "/{id}",
-                [Authorize(Roles = "Admin")]
-                (string id, ApplicationDbContext context) =>
+                [Authorize]
+                (string id, ApplicationDbContext context, HttpContext request) =>
                 {
                     Contact? contact = context.contacts.Find(id);
                     if (contact == null)
                         return Results.NotFound(
                             new { message = "Contact with supplied id not found" }
                         );
+
+                    if (!request.User.IsInRole("Admin"))
+                    {
+                        User? user = context
+                            .users.Include(u => u.contact)
+                            .FirstOrDefault(u => u.contact != null && u.contact.id == id);
+
+                        string? userId = request.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                        if (user != null)
+                            return TypedResults.BadRequest(
+                                new
+                                {
+                                    message = "You do not have permission to delete this contact",
+                                }
+                            );
+                    }
                     context.contacts.Remove(contact);
                     context.SaveChanges();
                     return Results.Ok(contact);
@@ -84,8 +100,13 @@ public static class ContactRoutes
         group
             .MapPut(
                 "/{id}",
-                [Authorize(Roles = "Admin")]
-                (string id, ContactDTO contact, ApplicationDbContext context) =>
+                [Authorize]
+                (
+                    string id,
+                    ContactDTO contact,
+                    ApplicationDbContext context,
+                    HttpContext request
+                ) =>
                 {
                     Contact? contactToUpdate = context.contacts.Find(id);
                     if (contactToUpdate == null)
@@ -93,6 +114,18 @@ public static class ContactRoutes
                             new { message = "Contact with supplied id not found" }
                         );
 
+                    if (!request.User.IsInRole("Admin"))
+                    {
+                        User? user = context
+                            .users.Include(u => u.contact)
+                            .FirstOrDefault(u => u.contact != null && u.contact.id == id);
+
+                        string? userId = request.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                        if (user != null && user.id != userId)
+                            return TypedResults.BadRequest(
+                                new { message = "You do not have permission to edit this contact" }
+                            );
+                    }
                     contactToUpdate.name = contact.name;
                     contactToUpdate.email = contact.email;
                     contactToUpdate.extension = contact.extension;

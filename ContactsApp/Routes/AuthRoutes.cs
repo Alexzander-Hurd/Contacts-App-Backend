@@ -32,9 +32,9 @@ public static class AuthRoutes
                             new { message = "Username or password is missing" }
                         );
 
-                    User? user = context.users.FirstOrDefault(u =>
-                        u.username == loginRequest.username
-                    );
+                    User? user = context
+                        .users.Include(u => u.contact)
+                        .FirstOrDefault(u => u.username == loginRequest.username);
                     if (user == null)
                         return Results.Json(
                             new { message = "Invalid username or password" },
@@ -93,25 +93,32 @@ public static class AuthRoutes
                     };
 
                     context.refresh_tokens.Add(newRefreshToken);
-                    context.SaveChanges();
 
-                    Contact? contact = await context.contacts.FirstOrDefaultAsync(c =>
-                        c.email == user.username
-                    );
-                    if (contact == null)
+                    if (user.contact == null)
                     {
-                        contact = new Contact
+                        Contact? contact = await context.contacts.FirstOrDefaultAsync(c =>
+                            c.email == user.username
+                        );
+                        if (contact == null)
                         {
-                            id = Guid.NewGuid().ToString(),
-                            name = user.username.Split('@')[0],
-                            email = user.username,
-                            extension = "---",
-                        };
-                        context.contacts.Add(contact);
-                        user.contact_id = contact.id;
-                        user.contact = contact;
-                        context.SaveChanges();
+                            contact = new Contact
+                            {
+                                id = Guid.NewGuid().ToString(),
+                                name = user.username.Split('@')[0],
+                                email = user.username,
+                                extension = "---",
+                            };
+                            context.contacts.Add(contact);
+                            user.contact_id = contact.id;
+                            user.contact = contact;
+                        }
+                        else
+                        {
+                            user.contact_id = contact.id;
+                            user.contact = contact;
+                        }
                     }
+                    context.SaveChanges();
 
                     return Results.Ok(
                         new TokenResponse
