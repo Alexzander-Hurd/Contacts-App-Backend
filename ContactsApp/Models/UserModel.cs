@@ -43,3 +43,9 @@ public class TokenResponse
     public required double expiry { get; set; }
     public required string refresh { get; set; }
 }
+
+public class UpdatePasswordRequest
+{
+    public required string oldPassword { get; set; }
+    public required string newPassword { get; set; }
+}

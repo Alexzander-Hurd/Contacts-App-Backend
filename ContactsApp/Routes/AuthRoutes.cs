@@ -264,5 +264,80 @@ public static class AuthRoutes
             .Produces<registerResponse>(200)
             .Produces<MessageResponse>(400)
             .WithTags("Auth");
+
+        app.MapPost(
+                "/update-password",
+                [Authorize]
+                async (
+                    UpdatePasswordRequest updatePasswordRequest,
+                    ApplicationDbContext context,
+                    HttpContext request
+                ) =>
+                {
+                    var user = request.User;
+                    string? userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                    User? appUser = await context.users.FirstOrDefaultAsync(u => u.id == userId);
+
+                    if (appUser == null)
+                        return Results.BadRequest(new { message = "User not found" });
+                    string salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+                    string passwordHash = Convert.ToBase64String(
+                        Rfc2898DeriveBytes.Pbkdf2(
+                            Encoding.UTF8.GetBytes(updatePasswordRequest.newPassword),
+                            Encoding.UTF8.GetBytes(salt),
+                            10000,
+                            HashAlgorithmName.SHA256,
+                            32
+                        )
+                    );
+                    appUser.password = passwordHash;
+                    appUser.salt = salt;
+                    context.SaveChanges();
+                    return Results.Ok(new { message = "Password updated successfully" });
+                }
+            )
+            .Produces<MessageResponse>(200)
+            .Produces<MessageResponse>(400)
+            .WithTags("Auth");
+
+        app.MapPost(
+                "/reset-password/{email}",
+                [Authorize(Roles = "Admin")]
+                (string email, ApplicationDbContext context) =>
+                {
+                    User? user = context.users.FirstOrDefault(u => u.username == email);
+                    if (user == null)
+                        return Results.BadRequest(new { message = "User not found" });
+                    string password = Convert
+                        .ToHexString(RandomNumberGenerator.GetBytes(5))
+                        .ToUpperInvariant();
+                    password = password.Replace("I", "1");
+                    password = password.Replace("O", "0");
+                    password = password.Replace("L", "1");
+                    password = password.Replace(
+                        "U",
+                        RandomNumberGenerator.GetInt32(0, 9).ToString()
+                    );
+                    string salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+                    string passwordHash = Convert.ToBase64String(
+                        Rfc2898DeriveBytes.Pbkdf2(
+                            Encoding.UTF8.GetBytes(password),
+                            Encoding.UTF8.GetBytes(salt),
+                            10000,
+                            HashAlgorithmName.SHA256,
+                            32
+                        )
+                    );
+                    user.password = passwordHash;
+                    user.salt = salt;
+                    context.SaveChanges();
+                    return Results.Ok(
+                        new { message = $"Password updated successfully: {password}" }
+                    );
+                }
+            )
+            .Produces<MessageResponse>(200)
+            .Produces<MessageResponse>(400)
+            .WithTags("Auth");
     }
 }
