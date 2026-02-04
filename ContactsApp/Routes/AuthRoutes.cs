@@ -300,44 +300,34 @@ public static class AuthRoutes
             .Produces<MessageResponse>(400)
             .WithTags("Auth");
 
-        app.MapPost(
-                "/reset-password/{email}",
-                [Authorize(Roles = "Admin")]
-                (string email, ApplicationDbContext context) =>
+        app.MapGet(
+                "/me",
+                [Authorize]
+                async (ApplicationDbContext context, HttpContext request) =>
                 {
-                    User? user = context.users.FirstOrDefault(u => u.username == email);
-                    if (user == null)
-                        return Results.BadRequest(new { message = "User not found" });
-                    string password = Convert
-                        .ToHexString(RandomNumberGenerator.GetBytes(5))
-                        .ToUpperInvariant();
-                    password = password.Replace("I", "1");
-                    password = password.Replace("O", "0");
-                    password = password.Replace("L", "1");
-                    password = password.Replace(
-                        "U",
-                        RandomNumberGenerator.GetInt32(0, 9).ToString()
-                    );
-                    string salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
-                    string passwordHash = Convert.ToBase64String(
-                        Rfc2898DeriveBytes.Pbkdf2(
-                            Encoding.UTF8.GetBytes(password),
-                            Encoding.UTF8.GetBytes(salt),
-                            10000,
-                            HashAlgorithmName.SHA256,
-                            32
-                        )
-                    );
-                    user.password = passwordHash;
-                    user.salt = salt;
-                    context.SaveChanges();
-                    return Results.Ok(
-                        new { message = $"Password updated successfully: {password}" }
-                    );
+                    var user = request.User;
+                    string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+                    if (userId == null)
+                        return Results.BadRequest(new { message = "User id is null" });
+
+                    User? appUser = await context
+                        .users.Include(u => u.contact)
+                        .FirstOrDefaultAsync(u => u.id == userId);
+                    if (appUser == null)
+                        return Results.NotFound(new { message = "User not found" });
+
+                    UserSession userSession = new UserSession
+                    {
+                        contact = appUser.contact,
+                        admin = user.IsInRole("Admin"),
+                    };
+
+                    return Results.Ok(userSession);
                 }
             )
-            .Produces<MessageResponse>(200)
-            .Produces<MessageResponse>(400)
+            .Produces<UserSession>(200)
+            .Produces(401)
             .WithTags("Auth");
 
         app.MapDelete(

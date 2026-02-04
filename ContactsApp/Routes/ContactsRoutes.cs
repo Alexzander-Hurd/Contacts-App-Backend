@@ -248,29 +248,5 @@ public static class ContactRoutes
             )
             .Produces<Favorite>(200)
             .Produces(401);
-
-        app.MapGet(
-                "/me",
-                [Authorize]
-                async (ApplicationDbContext context, HttpContext request) =>
-                {
-                    var user = request.User;
-                    string userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
-
-                    if (userId == null)
-                        return Results.BadRequest(new { message = "User id is null" });
-
-                    User? appUser = await context
-                        .users.Include(u => u.contact)
-                        .FirstOrDefaultAsync(u => u.id == userId);
-                    if (appUser == null || appUser.contact == null)
-                        return Results.NotFound(new { message = "User not found" });
-
-                    return Results.Ok(appUser.contact);
-                }
-            )
-            .Produces<Contact>(200)
-            .Produces(401)
-            .WithTags("Contacts");
     }
 }

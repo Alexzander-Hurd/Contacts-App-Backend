@@ -14,6 +14,12 @@ public class User
     public Contact? contact { get; set; }
 }
 
+public class UserSession
+{
+    public Contact? contact { get; set; }
+    public bool admin { get; set; } = false;
+}
+
 public class RefreshToken
 {
     [Key]

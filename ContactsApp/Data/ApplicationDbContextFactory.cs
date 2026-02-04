@@ -9,14 +9,13 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         var builder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        
+
         IConfigurationRoot config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json")
             .Build();
 
         builder.UseSqlite(config.GetConnectionString("DefaultConnection"));
-        
 
         return new ApplicationDbContext(builder.Options);
     }
