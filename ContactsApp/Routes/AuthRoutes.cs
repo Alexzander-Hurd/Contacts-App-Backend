@@ -339,5 +339,54 @@ public static class AuthRoutes
             .Produces<MessageResponse>(200)
             .Produces<MessageResponse>(400)
             .WithTags("Auth");
+
+        app.MapDelete(
+                "/me",
+                [Authorize]
+                async (ApplicationDbContext context, HttpContext request) =>
+                {
+                    var user = request.User;
+                    string? userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                    User? appUser = await context
+                        .users.Include(u => u.contact)
+                        .FirstOrDefaultAsync(u => u.id == userId);
+                    if (appUser == null)
+                        return Results.BadRequest(new { message = "User not found" });
+
+                    if (appUser.contact != null)
+                    {
+                        List<GroupMember>? groupMembers = await context
+                            .group_members.Where(gm => gm.contactId == appUser.contact.id)
+                            .ToListAsync();
+                        if (groupMembers != null && groupMembers.Count > 0)
+                            context.group_members.RemoveRange(groupMembers);
+
+                        List<Favorite>? favorites = await context
+                            .favorites.Where(f => f.contactId == appUser.contact.id)
+                            .ToListAsync();
+                        if (favorites != null && favorites.Count > 0)
+                            context.favorites.RemoveRange(favorites);
+
+                        Console.WriteLine(appUser.contact.id);
+                        Contact? contact = appUser.contact;
+                        appUser.contact = null;
+                        appUser.contact_id = null;
+                        context.contacts.Remove(contact);
+                    }
+
+                    List<RefreshToken>? refreshTokens = await context
+                        .refresh_tokens.Where(rt => rt.user.id == appUser.id)
+                        .ToListAsync();
+                    if (refreshTokens != null && refreshTokens.Count > 0)
+                        context.refresh_tokens.RemoveRange(refreshTokens);
+
+                    context.users.Remove(appUser);
+                    await context.SaveChangesAsync();
+                    return Results.Ok(new { message = "User deleted successfully" });
+                }
+            )
+            .Produces<MessageResponse>(200)
+            .Produces<MessageResponse>(400)
+            .WithTags("Auth");
     }
 }
