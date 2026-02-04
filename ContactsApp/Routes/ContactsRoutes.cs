@@ -108,27 +108,41 @@ public static class ContactRoutes
                     HttpContext request
                 ) =>
                 {
-                    Contact? contactToUpdate = context.contacts.Find(id);
-                    if (contactToUpdate == null)
-                        return Results.NotFound(
-                            new { message = "Contact with supplied id not found" }
-                        );
+                    User? user = context
+                        .users.Include(u => u.contact)
+                        .FirstOrDefault(u => u.contact != null && u.contact.id == id);
 
                     if (!request.User.IsInRole("Admin"))
                     {
-                        User? user = context
-                            .users.Include(u => u.contact)
-                            .FirstOrDefault(u => u.contact != null && u.contact.id == id);
-
                         string? userId = request.User.FindFirstValue(ClaimTypes.NameIdentifier);
                         if (user != null && user.id != userId)
                             return TypedResults.BadRequest(
                                 new { message = "You do not have permission to edit this contact" }
                             );
                     }
+                    Contact? contactToUpdate = null;
+                    if (user == null)
+                    {
+                        contactToUpdate = context
+                            .contacts.AsNoTracking()
+                            .FirstOrDefault(c => c.id == id);
+                    }
+                    else if (user.username != contact.email)
+                    {
+                        contactToUpdate = user.contact;
+                        user.username = contact.email;
+                        context.users.Update(user);
+                    }
+
+                    if (contactToUpdate == null)
+                        return Results.NotFound(
+                            new { message = "Contact with supplied id not found" }
+                        );
+
                     contactToUpdate.name = contact.name;
                     contactToUpdate.email = contact.email;
                     contactToUpdate.extension = contact.extension;
+                    context.contacts.Update(contactToUpdate);
                     context.SaveChanges();
                     return Results.Ok(contactToUpdate);
                 }
