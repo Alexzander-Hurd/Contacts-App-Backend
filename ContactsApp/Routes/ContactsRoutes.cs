@@ -127,13 +127,15 @@ public static class ContactRoutes
                             .contacts.AsNoTracking()
                             .FirstOrDefault(c => c.id == id);
                     }
-                    else if (user.username != contact.email)
+                    else
                     {
                         contactToUpdate = user.contact;
-                        user.username = contact.email;
-                        context.users.Update(user);
+                        if (user.username != contact.email)
+                        {
+                            user.username = contact.email;
+                            context.users.Update(user);
+                        }
                     }
-
                     if (contactToUpdate == null)
                         return Results.NotFound(
                             new { message = "Contact with supplied id not found" }
